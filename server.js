@@ -75,10 +75,10 @@ app.get('/', (req, res) => {
             unreadMessages: 'GET /api/unread-messages',
             chatMessages: 'GET /api/chats/:chatId/messages?limit=50',
             unreadFromChat: 'GET /api/chats/:chatId/unread',
-            markRead: 'POST /api/chats/:chatId/mark-read',
-            markAllRead: 'POST /api/mark-all-read',
+            markAsRead: 'POST /api/chats/:chatId/mark-as-read',
+            markAllRead: 'POST /api/mark-all-as-read',
             sendMessage: 'POST /api/send-message',
-            searchMessages: 'GET /api/search?query=keyword&limit=50',
+            searchMessages: 'GET /api/search-messages?query=keyword&limit=50',
             contactInfo: 'GET /api/contacts/:contactId',
             allContacts: 'GET /api/contacts'
         }
@@ -236,7 +236,7 @@ app.get('/api/chats/:chatId/messages', requireClient, asyncHandler(async (req, r
 }));
 
 // Get unread messages from a specific chat
-app.get('/api/chats/:chatId/unread', requireClient, asyncHandler(async (req, res) => {
+app.get('/api/chats/:chatId/unread-messages', requireClient, asyncHandler(async (req, res) => {
     const { chatId } = req.params;
     const chat = await whatsappClient.getChatById(chatId);
     const unreadMessages = await whatsappClient.getUnreadMessagesFromChat(chatId);
@@ -260,7 +260,7 @@ app.get('/api/chats/:chatId/unread', requireClient, asyncHandler(async (req, res
 }));
 
 // Mark a specific chat as read
-app.post('/api/chats/:chatId/mark-read', requireClient, asyncHandler(async (req, res) => {
+app.post('/api/chats/:chatId/mark-as-read', requireClient, asyncHandler(async (req, res) => {
     const { chatId } = req.params;
     const result = await whatsappClient.markChatAsRead(chatId);
 
@@ -273,7 +273,7 @@ app.post('/api/chats/:chatId/mark-read', requireClient, asyncHandler(async (req,
 }));
 
 // Mark all chats as read
-app.post('/api/mark-all-read', requireClient, asyncHandler(async (req, res) => {
+app.post('/api/mark-all-as-read', requireClient, asyncHandler(async (req, res) => {
     const results = await whatsappClient.markAllChatsAsRead();
 
     const markedCount = results.filter(r => r.success).length;
@@ -333,7 +333,7 @@ app.post('/api/send-message-to-self', requireClient, asyncHandler(async (req, re
 }));
 
 // Search messages by keyword
-app.get('/api/search', requireClient, asyncHandler(async (req, res) => {
+app.get('/api/search-messages', requireClient, asyncHandler(async (req, res) => {
     const { query, limit = 50, chatId } = req.query;
 
     if (!query) {
