@@ -110,6 +110,21 @@ def generate_digest_messages():
         return rows
 
 
+tools = {
+    "get_chats": get_chats,
+    "get_unread_chats": get_unread_chats,
+    "get_unread_messages": get_unread_messages,
+    "get_messages_from_chat": get_messages_from_chat,
+    "get_unread_messages_from_chat": get_unread_messages_from_chat,
+    "mark_chat_as_read": mark_chat_as_read,
+    "mark_all_chats_as_read": mark_all_chats_as_read,
+    "send_message_to_self": send_message_to_self,
+    "search_messages": search_messages,
+    "save_message_to_db": save_message_to_db,
+    "generate_digest_messages": generate_digest_messages
+}
+
+
 if __name__ == "__main__":
 
     #checkpoint_saver = InMemorySaver()
@@ -124,20 +139,6 @@ if __name__ == "__main__":
                            timestamp TEXT,
                            digest INTEGER DEFAULT 0)''')
         conn.commit()
-
-    tools = {
-        "get_chats": get_chats,
-        "get_unread_chats": get_unread_chats,
-        "get_unread_messages": get_unread_messages,
-        "get_messages_from_chat": get_messages_from_chat,
-        "get_unread_messages_from_chat": get_unread_messages_from_chat,
-        "mark_chat_as_read": mark_chat_as_read,
-        "mark_all_chats_as_read": mark_all_chats_as_read,
-        "send_message_to_self": send_message_to_self,
-        "search_messages": search_messages,
-        "save_message_to_db": save_message_to_db,
-        "generate_digest_messages": generate_digest_messages
-    }
 
     model = init_chat_model(
         model="gemini-2.5-flash",
