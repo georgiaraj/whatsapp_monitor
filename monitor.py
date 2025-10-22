@@ -80,7 +80,7 @@ def search_messages(query, limit=10):
     response.raise_for_status()
     return response.json()
 
-def save_message_to_db(chat_id: str,
+def save_message_to_db(chat_id: str, chat_name: str,
                        message: str, timestamp: str = None):
     '''Saves messages to the local SQLite database.
     Arguments:
@@ -93,8 +93,8 @@ def save_message_to_db(chat_id: str,
 
     with sqlite3.connect(db_file) as conn:
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO messages (chat_id, message, timestamp)"
-                       "VALUES (?, ?, ?)", (chat_id, message, timestamp)
+        cursor.execute("INSERT INTO messages (chat_id, chat_name, message, timestamp)"
+                       "VALUES (?, ?, ?, ?)", (chat_id, chat_name, message, timestamp)
                        )
         conn.commit()
 
@@ -102,7 +102,7 @@ def generate_digest_messages():
     '''Generates a list of messages and timestamps not already marked as digest.'''
     with sqlite3.connect(db_file) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT message, timestamp FROM messages WHERE digest = 0")
+        cursor.execute("SELECT chat_name, message, timestamp FROM messages WHERE digest = 0")
         rows = cursor.fetchall()
         # Mark messages as digest
         cursor.execute("UPDATE messages SET digest = 1 WHERE digest = 0")
@@ -119,6 +119,7 @@ if __name__ == "__main__":
         cursor.execute('''CREATE TABLE IF NOT EXISTS messages
                           (id INTEGER PRIMARY KEY AUTOINCREMENT,
                            chat_id TEXT,
+                           chat_name TEXT,
                            message TEXT,
                            timestamp TEXT,
                            digest INTEGER DEFAULT 0)''')
@@ -147,9 +148,9 @@ if __name__ == "__main__":
 
     If you notice messages that are directly to me, or require urgent action, you should notify me by sending a message to self. Please mark this message as coming from the Whatsapp monitor, but ensure that it details the person who sent the message and the content of the message. Use this text at the start of the message: "**** Whatsapp monitor alert ****".
 
-    You should also store any low priority information in order to generate a digest at the end of the day.
+    You should also store any low priority information in order to generate a digest at the end of the day. Please do not mark as messages as read.
 
-    At the end of the day, generate a summary of all low priority information collected today and send it to me as a message to self. If there are no messages then just do nothing. Clearly mark this as a digest from the Whatsapp monitor.
+    At the end of the day, generate a summary (not just a direct recounting of) of all low priority information and conversations collected today and send it to me as a message to self. If there are no messages then just do nothing. Clearly mark this as a digest from the Whatsapp monitor.
     '''
 
     monitor = create_react_agent(
@@ -178,7 +179,7 @@ if __name__ == "__main__":
 
     response = monitor.invoke({
         "messages": [
-            {"role": "user", "content": "Generate a digest of low priority information collected today."}
+            {"role": "user", "content": "Generate a digest of low priority information collected today and send as a message to self."}
         ]
     })
 
