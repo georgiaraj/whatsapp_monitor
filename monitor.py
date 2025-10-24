@@ -31,7 +31,8 @@ class Tools:
                           chat_name TEXT,
                           message TEXT,
                           timestamp TEXT,
-                          digest INTEGER DEFAULT 0)''')
+                          priority INTEGER DEFAULT 0,
+                          processed INTEGER DEFAULT 0)''')
             conn.commit()
 
     def get_user_info(self):
@@ -103,32 +104,46 @@ class Tools:
         return response.json()
 
     def save_message_to_db(self, chat_id: str, chat_name: str,
-                           message: str, timestamp: str = None, digest: int = 0):
+                           message: str, timestamp: str = None, processed: int = 0):
         '''Saves messages to the local SQLite database.
         Arguments:
         chat_id -- The ID of the chat
         message -- The message content
         timestamp -- The timestamp of the message (optional)
-        digest -- Whether the message has been included in a digest (0 or 1)
+        processed -- Whether the message has been processed (either by alerting or including in digest))
         '''
         if timestamp is None:
             timestamp = datetime.now().isoformat()
 
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO messages (chat_id, chat_name, message, timestamp, digest) "
-                           "VALUES (?, ?, ?, ?, ?)", (chat_id, chat_name, message, timestamp, digest)
+            cursor.execute("INSERT INTO messages (chat_id, chat_name, message, timestamp, processed) "
+                           "VALUES (?, ?, ?, ?, ?)", (chat_id, chat_name, message, timestamp, processed)
                            )
             conn.commit()
 
-    def generate_digest_messages(self):
-        '''Generates a list of messages and timestamps not already marked as digest.'''
+    def prioritise_message(self, message_id: int, priority: int):
+        '''Sets the priority of a message in the local SQLite database.'''
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT chat_name, message, timestamp FROM messages WHERE digest = 0")
+            cursor.execute("UPDATE messages SET priority = ? WHERE id = ?", (priority, message_id))
+            conn.commit()
+
+    def mark_message_as_processed(self, message_id: int):
+        '''Marks a message as processed in the local SQLite database.'''
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE messages SET processed = 1 WHERE id = ?", (message_id,))
+            conn.commit()
+
+    def generate_unprocessed_messages(self):
+        '''Generates a list of messages and timestamps not already marked as processed.'''
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, chat_name, message, timestamp FROM messages WHERE processed = 0")
             rows = cursor.fetchall()
-            # Mark messages as digest
-            cursor.execute("UPDATE messages SET digest = 1 WHERE digest = 0")
+            # Mark messages as processed
+            cursor.execute("UPDATE messages SET processed = 1 WHERE processed = 0")
             conn.commit()
 
         return rows
@@ -147,7 +162,9 @@ class Tools:
             "send_message_to_self": self.send_message_to_self,
             "search_messages": self.search_messages,
             "save_message_to_db": self.save_message_to_db,
-            "generate_digest_messages": self.generate_digest_messages
+            "prioritise_message": self.prioritise_message,
+            "mark_message_as_processed": self.mark_message_as_processed,
+            "generate_unprocessed_messages": self.generate_unprocessed_messages
         }
 
 
@@ -171,24 +188,24 @@ if __name__ == "__main__":
 
     You should then prioritise the messages based on urgency and importance. To do this for each one you should consider the following criteria:
     * Is the message from a close contact (family, friend, work colleague)?
-    * Does the message contain time-sensitive information (e.g., event reminders, urgent requests)?
+    * Does the message contain time-sensitive information (e.g., event reminders, urgent requests) that needs to be addressed in the next 48 hours?
     * Does the message require an immediate response?
     * Was the message sent in reply to a previous message of mine, or mention me, and so will require a response?
 
     You may need to look at the previous messages in the chat, or to search messages within a chat to get context to help you decide on priority.
 
-    For each criteria above assign a 1 or 0 score and then sum the scores. If the total score is 2 or more then classify the message as high priority, otherwise classify it as low priority.
+    For each criteria above assign a 1 or 0 score and then sum the scores. Set this as the priority in the database. If the total score is 2 or more then classify the message as high priority, otherwise classify it as low priority.
 
     If there are any high priority messages:
     * Send one message to self using the given tool to alert me of the message(s) and its priority. Don't include the content, just the fact that the message is high priority and a brief summary of why. Start this message with the following text: "**** Whatsapp priority alert ****. You can combine the reason for multiple high priority messages in one chat into a single alert if there are more than one.
-    * Mark all high priority messages as digest in the database.
+    * Mark all high priority messages as processed in the database.
     '''
 
     digest_prompt = '''You are a message digest agent that should generate a summary of low priority information collected today. Load messages from the database and generate a summary (not just a direct recounting of) of all low priority information and conversations collected today and send it to me as a message to self. Note that sometimes to understand a message you may need to reference previous messages in the chat or search within the chat for context - do not just summarise individual messages if they make no sense on their own.
 
     Do not mark messages as read in the chat application.
 
-    If there are no messages then just do nothing. Clearly mark this as a digest from the Whatsapp monitor using the following text at the start of the message: "**** Whatsapp daily digest **** '''
+    If there are no messages then just do nothing. Clearly mark this as a processed from the Whatsapp monitor using the following text at the start of the message: "**** Whatsapp daily digest **** '''
 
     download_agent = create_react_agent(
         model=model,
