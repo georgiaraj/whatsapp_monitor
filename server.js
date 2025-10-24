@@ -124,6 +124,22 @@ app.get('/qr', (req, res) => {
     }
 });
 
+
+// Get user info
+app.get('/api/user-info', requireClient, asyncHandler(async (req, res) => {
+    const info = await whatsappClient.getUserInfo();
+
+    res.json({
+        success: true,
+        data: {
+            name: info.pushname,
+            number: info.number,
+            wid: info.wid,
+            platform: info.platform
+        }
+    });
+}
+
 // Get all chats
 app.get('/api/chats', requireClient, asyncHandler(async (req, res) => {
     const chats = await whatsappClient.getChats();
