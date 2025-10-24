@@ -226,8 +226,8 @@ class WhatsAppClient extends EventEmitter {
         const sentMessage = await this.client.sendMessage(myNumber, message);
 
         // Mark the message as unread
-        const chat = await this.getChatById(myNumber);
-        await chat.markUnread();
+        //const chat = await this.getChatById(myNumber);
+        //await chat.markUnread();
 
         return sentMessage;
     }

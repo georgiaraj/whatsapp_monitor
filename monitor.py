@@ -81,20 +81,21 @@ def search_messages(query, limit=10):
     return response.json()
 
 def save_message_to_db(chat_id: str, chat_name: str,
-                       message: str, timestamp: str = None):
+                       message: str, timestamp: str = None, digest: int = 0):
     '''Saves messages to the local SQLite database.
     Arguments:
         chat_id -- The ID of the chat
         message -- The message content
         timestamp -- The timestamp of the message (optional)
+        digest -- Whether the message has been included in a digest (0 or 1)
     '''
     if timestamp is None:
         timestamp = datetime.now().isoformat()
 
     with sqlite3.connect(db_file) as conn:
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO messages (chat_id, chat_name, message, timestamp)"
-                       "VALUES (?, ?, ?, ?)", (chat_id, chat_name, message, timestamp)
+        cursor.execute("INSERT INTO messages (chat_id, chat_name, message, timestamp, digest) "
+                       "VALUES (?, ?, ?, ?, ?)", (chat_id, chat_name, message, timestamp, digest)
                        )
         conn.commit()
 
@@ -145,19 +146,32 @@ if __name__ == "__main__":
         model_provider="google_genai",
         api_key=GOOGLE_API_KEY
     )
-    prompt = '''You are a message monitor agent that should check for new messages in chats.
+    monitor_prompt = '''You are a message monitor agent that should check for new messages in chats.
 
-    If you notice messages that are directly to me, or require urgent action, you should notify me by sending a message to self. Please mark this message as coming from the Whatsapp monitor, but ensure that it details the person who sent the message and the content of the message. Use this text at the start of the message: "**** Whatsapp monitor alert ****".
+    If you notice messages that are directly to me, or in group chats but appear to be important to action, you should notify me by sending a message to self. Rather than including the full message, please tell me which group chat to look at. If a direct message, then please send me the link to the whatsapp chat so that I can read and action the message myself. Please mark this message as coming from the Whatsapp monitor, but ensure that it details the person who sent the message and the content of the message. Use this text at the start of the message: "**** Whatsapp monitor alert ****".
 
-    You should also store any low priority information in order to generate a digest at the end of the day. Please do not mark as messages as read.
+    For some messages, particularly in group chats, you might need more context to decide if something is important. In such cases, you should get previous messages from the chat, or search withing the chat, to get a better understanding of the conversation before deciding whether to alert me.
 
-    At the end of the day, generate a summary (not just a direct recounting of) of all low priority information and conversations collected today and send it to me as a message to self. If there are no messages then just do nothing. Clearly mark this as a digest from the Whatsapp monitor.
+    You should also store all messages you see in a local database for future reference. Mark the ones that have already be sent in the alert using the digest argument so that they are not included in a future digest.
+
+    Do not mark messages as read in the chat application unless explicitly told to do so. Only alert me of priority messages; do not alert me of low priority information.
     '''
+
+    digest_prompt = '''You are a message digest agent that should generate a summary of low priority information collected today. Load messages from the database and generate a summary (not just a direct recounting of) of all low priority information and conversations collected today and send it to me as a message to self. Note that sometimes to understand a message you may need to reference previous messages in the chat or search within the chat for context.
+
+    If there are no messages then just do nothing. Clearly mark this as a digest from the Whatsapp monitor using the following text at the start of the message: "**** Whatsapp daily digest **** '''
 
     monitor = create_react_agent(
         model=model,
         tools=tools.values(),
-        prompt=prompt,
+        prompt=monitor_prompt,
+        #checkpointer=checkpoint_saver
+    )
+
+    digest_agent = create_react_agent(
+        model=model,
+        tools=tools.values(),
+        prompt=digest_prompt,
         #checkpointer=checkpoint_saver
     )
 
@@ -178,7 +192,7 @@ if __name__ == "__main__":
 
     print(response['messages'][-1].content)
 
-    response = monitor.invoke({
+    response = digest_agent.invoke({
         "messages": [
             {"role": "user", "content": "Generate a digest of low priority information collected today and send as a message to self."}
         ]
